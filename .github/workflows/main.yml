@@ -1,0 +1,71 @@
+name: CI
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+  pull_request:
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Permssions
+permissions:
+  contents: read
+  issues: read
+  checks: write
+  pull-requests: write
+  
+jobs:
+  test_and_coverage:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.12]
+        os: [ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+
+    - name: Install dependencies
+      run: |
+        python --version
+        pip --version
+        pip install qutip sympy numpy pytest numba scipy ipython tk pytest-cov
+        pip install .
+
+    - name: Run tests and coverage
+      run: |
+        python simos/test/report_versions.py
+        pytest --junitxml=report.xml --cov=simos --cov-report term --cov-report xml:coverage.xml
+      continue-on-error: true
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: junit-report
+        path: report.xml
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.xml
+
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      if: always()
+      with:
+        files: |
+          report.xml
+      

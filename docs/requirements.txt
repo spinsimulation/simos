@@ -1,0 +1,12 @@
+# Defining the exact version will make sure things don't break
+sphinx==7.3.7
+sphinx_rtd_theme==2.0.0
+sphinx-autobuild==2024.4.16
+sphinx-exec-code==0.12
+sphinxcontrib-jsmath==1.0.1
+numpy
+matplotlib
+scipy
+sympy
+qutip
+IPython

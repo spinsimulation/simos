@@ -1,0 +1,55 @@
+# This file is a template, and might need editing before it works on your project.
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Python.gitlab-ci.yml
+
+# Official language image. Look for the different tagged releases at:
+# https://hub.docker.com/r/library/python/tags/
+image: python:latest
+
+# Change pip's cache directory to be inside the project directory since we can
+# only cache local items.
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+# https://pip.pypa.io/en/stable/topics/caching/
+cache:
+  paths:
+    - .cache/pip
+
+before_script:
+  - python --version ; pip --version  # For debugging
+  - pip install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
+
+test:
+  script:
+    - pip install --no-cache-dir qutip sympy numpy pytest numba scipy ipython tk pytest-cov
+    - pip install .
+    - python simos/test/report_versions.py
+    - pytest --junitxml=report.xml --cov=simos --cov-report term --cov-report xml:coverage.xml
+  artifacts:
+    when: always
+    paths:
+      - report.xml
+      - coverage.xml
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+oldversion_check:
+  script:
+    - virtualenv oldenv
+    - source oldenv/bin/activate
+    - pip install numpy==1.25.0 scipy==1.12.0 qutip==5.0.0 sympy==1.11 numba==0.58.0 pytest ipython tk
+    - pip install .
+    - python simos/test/report_versions.py
+    - pytest --junitxml=report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml

@@ -1,0 +1,33 @@
+name: Test with Latest Python & Numpy
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight (adjust if needed)
+  workflow_dispatch:      # Allows you to trigger the workflow manually
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.x"]  # Include the latest Python versions, '3.x' uses the latest stable Python release
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        pip install numpy  # Fetches the latest version of numpy
+
+    - name: Check Python version
+      run: python -c "import sys; print(sys.version)"
+    
+    - name: Check Numpy version
+      run: python -c "import numpy; print(numpy.__version__)"
