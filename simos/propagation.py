@@ -177,6 +177,7 @@ def prop(H0,dt,*rho,c_ops=[],H1=None,carr1=None,c_ops2=[],carr2=None,proj=[],eng
         raise NotImplementedError('The sparse backend is currently not implemented by the prop function.')
     tidyup_fun = getattr(getattr(backends, backend), 'tidyup')
     data_fun =  getattr(getattr(backends, backend), 'data')
+    isket = getattr(getattr(backends, backend), 'isket')
     # Inconsistent input
     # Raise error if H1 is given but carr1 is not and vice versa
     # Raise error if c_ops2 is given but carr2 is not and vice versa
@@ -243,7 +244,33 @@ def prop(H0,dt,*rho,c_ops=[],H1=None,carr1=None,c_ops2=[],carr2=None,proj=[],eng
                 qevo = qu.QobjEvo([H0] + coeff, tlist=times, order=1)
                 result =  qu.mesolve(qevo,rho[0],times,c_ops=c_ops,**kwargs)
                 return result.states[-1]
+            
+    if engine == 'RK45':
+        # ensure that rhoin is a density matrix
+        if len(rho) == 0:
+            raise ValueError('For the RK45 engine, a state vector or density matrix must be provided.')
+        if isket(rho[0]):
+            ket2dm = getattr(getattr(backends,backend), 'ket2dm')
+            rhoin = ket2dm(rhoin)
+        else:
+            rhoin = rho[0]
+        rhoout = solve_lindblad(data_fun(rhoin),dt,H0=data_fun(H0),H1=[data_fun(H1[i]) for i in range(len(H1))],c_ops=[data_fun(c_ops[i]) for i in range(len(c_ops))],carr1=carr1,c_ops2=[data_fun(c_ops2[i]) for i in range(len(c_ops2))],carr2=carr2)
+        return tidyup_fun(rhoout,dims=dims)
 
+    def build_timedependent_liouvillian(H0,c_ops,carr1,c_ops2,carr2,backend):
+        liouvillian = getattr(getattr(backends,backend), 'liouvillian')
+        if c_ops2 == None:
+            c_ops2 = []
+            carr2 = []
+        if len(c_ops2) == 0:
+            return liouvillian(H0,c_ops),[liouvillian(H1[i],[]) for i in range(len(H1))],carr1
+        else:
+            lindbladian = getattr(getattr(backends,backend), 'lindbladian')
+            L = liouvillian(H0,c_ops)
+            L1 = [liouvillian(H1[i],[]) for i in range(len(H1))]
+            L2 = [lindbladian(c_ops2[i]) for i in range(len(c_ops2))]
+            return L,L1+L2,_np.concatenate((carr1,carr2))
+        
     # Check if we have to go to Liouvillian
     if (len(c_ops) > 0) or (len(c_ops2) > 0):
         Hm0,Hm1,cmarr = build_timedependent_liouvillian(H0,c_ops,carr1,c_ops2,carr2,backend)
@@ -262,7 +289,7 @@ def prop(H0,dt,*rho,c_ops=[],H1=None,carr1=None,c_ops2=[],carr2=None,proj=[],eng
         Ut = handle.equiprop(dt,carr1)
         Ut = tidyup_fun(Ut,dims=dims)
         handle.destroy()
-
+    
     if len(rho) == 0:
         # Propagator return
         return Ut
@@ -283,21 +310,6 @@ def prop(H0,dt,*rho,c_ops=[],H1=None,carr1=None,c_ops2=[],carr2=None,proj=[],eng
             return Ut*rho*Ut.dag()
 
 
-
-    def build_timedependent_liouvillian(H0,c_ops,carr1,c_ops2,carr2):
-        liouvillian = getattr(getattr(backends,backend), 'liouvillian')
-        lindbladian = getattr(getattr(backends,backend), 'lindbladian')
-        if c_ops2 == None:
-            c_ops2 = []
-            carr2 = []
-        if len(c_ops2) == 0:
-            return liouvillian(H0,c_ops),[liouvillian(H1[i],[]) for i in range(len(H1))],carr1
-        else:
-            L = liouvillian(H0,c_ops)
-            L1 = [liouvillian(H1[i],[]) for i in range(len(H1))]
-            L2 = [lindbladian(c_ops2[i]) for i in range(len(c_ops2))]
-            return L,L1+L2,_np.concatenate((carr1,carr2))
-    
   
 def generate_simpson(cin,dt=None,magnus=True,second_order=True):
     """Generate the Simpson coefficients for the time-dependent Hamiltonian. Compute also modulation arrays for the Magnus expansion.
@@ -528,3 +540,232 @@ def rotate_operator(system, dm, *args):
     else:
         return dm
 
+from scipy.interpolate import interp1d
+from scipy.integrate import solve_ivp
+
+def _precompute_interpolators(carr, dt, interpolation_kind='linear'):
+    """
+    Prepare interpolated functions or arrays for time-dependent coefficients.
+
+    Parameters:
+        carr (list): List of time-dependent coefficient arrays or callables.
+        dt (float): Time step for fixed-point evaluation.
+        interpolation_kind (str): Kind of interpolation ('linear', 'cubic', etc.).
+
+    Returns:
+        list: List of callable functions (either interpolators or original callables).
+    """
+    interpolators = []
+    N = len(carr[0])
+    t = _np.arange(0, N * dt, dt)
+    for c in carr:
+        interpolators.append(interp1d(t, c, kind=interpolation_kind, bounds_error=False, fill_value="extrapolate"))
+    return interpolators
+
+def _compute_hamiltonian(t, H0, H1, carr1):
+    """
+    Efficiently compute the time-dependent Hamiltonian H(t).
+
+    Parameters:
+        t (float): Current time.
+        H0 (ndarray): Static Hamiltonian.
+        H1 (ndarray): Stack of time-dependent Hamiltonians (3D array).
+        carr1 (list of callables): Time-dependent coefficients.
+
+    Returns:
+        ndarray: The Hamiltonian H(t).
+    """
+    if H1 is None:
+        return H0
+    if len(H1) == 0:
+        return H0
+    coefficients = _np.array([carr(t) for carr in carr1])  # Evaluate all coefficients
+    weighted_sum = _np.tensordot(coefficients, H1, axes=1)  # Weighted sum of H1
+
+    if H0 is not None:
+        weighted_sum += H0
+    return weighted_sum
+
+def _compute_lindblad_terms(t, rho, c_ops, c_ops2, carr2):
+    """
+    Efficiently compute Lindblad terms for the equation.
+
+    Parameters:
+        t (float): Current time.
+        rho (ndarray): Current density matrix.
+        c_ops (ndarray): List of static collpase operators.
+        c_ops2 (ndarray): List of time-dependent collapse operators.
+        carr2 (list of callables): Time-dependent coefficients for c_ops2.
+
+    Returns:
+        ndarray: Sum of Lindblad terms.
+    """
+    
+    if c_ops2 is None:
+        L_total = c_ops
+    elif len(c_ops2) == 0:
+        L_total = c_ops
+    else:
+        coefficients = _np.array([carr(t) for carr in carr2])
+        L_time_dependent = _np.tensordot(coefficients, c_ops2, axes=1)
+        L_total = _np.concatenate((c_ops, L_time_dependent), axis=0)
+
+    # Compute Lindblad terms in batch
+    L_rho_Ldag = _np.einsum('aij,jk,akl->ail', L_total, rho, _np.conj(L_total))  # L_k @ rho @ L_k^†
+    Ldag_L = _np.einsum('aij,ajk->aik', _np.conj(L_total), L_total)  # L_k^† @ L_k
+    anti_commutator = _np.einsum('aij,jk->aik', Ldag_L, rho) + _np.einsum('jk,aik->aij', rho, Ldag_L)
+    return _np.sum(L_rho_Ldag - 0.5 * anti_commutator, axis=0)
+
+def lindblad_rhs(t, rho_flat, H0, H1, carr1, c_ops, c_ops2, carr2):
+    """
+    Compute the right-hand side of the Lindblad equation.
+
+    Parameters:
+        t (float): Current time.
+        rho_flat (ndarray): Flattened density matrix (1D array).
+        H0, H1, carr1, c_ops, c_ops2, carr2: Hamiltonian and collapse operator parameters.
+
+    Returns:
+        ndarray: Flattened time derivative of the density matrix.
+    """
+    n = int(_np.sqrt(len(rho_flat)))
+    rho = rho_flat.reshape((n, n))
+
+    # Compute H(t)
+    H_t = _compute_hamiltonian(t, H0, H1, carr1)
+
+    # Compute -i[H(t), rho]
+    L = -1j * (H_t @ rho - rho @ H_t)
+
+    if not (len(c_ops) == 0 and len(c_ops2) == 0):
+       # Compute Lindblad terms
+       L += _compute_lindblad_terms(t, rho, c_ops, c_ops2, carr2)
+    
+    return L.flatten()
+
+def solve_lindblad(rho0, dt, H0=None, H1=None,carr1=None,c_ops=None,c_ops2=None,carr2=None):
+    """
+    Solve the Lindblad equation
+
+    Parameters:
+        rho0 (ndarray): Initial density matrix.
+        dt (float): Time step for fixed-point evaluation or end-time when list of functions is provided.
+        H0, H1, carr1, c_ops, c_ops2, carr2: Parameters for the Lindblad RHS.
+        t_array (ndarray, optional): Array of time points corresponding to fixed-point coefficient arrays.
+
+    Returns:
+        ndarray: Density matrix at final time t_eval[-1].
+    """
+
+    if carr1 is None:
+        carr1 = []
+    if carr2 is None:
+        carr2 = []
+    if c_ops is None:
+        c_ops = []
+    if c_ops2 is None:
+        c_ops2 = []
+    
+    if H1 is None:
+        H1 = []
+    
+    tend1 = dt
+    if len(carr1) > 0:
+        # check if carr1[0] is a callable
+        if not callable(carr1[0]):
+            tend1 = len(carr1[0]) * dt
+            carr1 = _precompute_interpolators(carr1, dt)
+    if len(carr2) > 0:
+        # check if carr2[0] is a callable
+        if not callable(carr2[0]):
+            carr2 = _precompute_interpolators(carr2, dt)
+            tend2 = len(carr2[0]) * dt
+            assert tend1 == tend2, "Time-dependent coefficients must have the same length."
+    
+    t_span = (0, tend1)
+
+
+    # Convert inputs for batch processing
+
+    rho0_flat = rho0.flatten()
+    
+    result = solve_ivp(
+        lindblad_rhs, t_span, rho0_flat, t_eval=None, vectorized=False,
+        args=(H0, H1, carr1, c_ops, c_ops2, carr2),
+        method='RK45'
+    )
+    return result.y[:, -1].reshape(rho0.shape)  # Return final density matrix
+
+
+#############################
+# Lab Frame Evolution       #
+#############################
+
+def rabi2b1(w_rabi,S, gyromagnetic_ratio,ms=None):
+    """Convert an angular rabi frequency to the corresponding B1 field under the rotating wave approximation ms=None means highest ms"""
+    # https://doi.org/10.1016/0009-2614(90)85493-V
+    # S = (spin_multiplicity - 1)/2
+    # w_rabi = y*b1/2 * sqrt((S+1)*S-ms*(ms-1))
+    if ms == None:
+        ms = S
+    fact = _np.sqrt(S*(S+1)-ms*(ms-1))
+    #print(fact)
+    return _np.abs((w_rabi/fact*2)/gyromagnetic_ratio)
+    
+def square_pulse(H0,Hrf,f,phase,amplitude,dur,*rho,pts_per_cycle=100,wallclock='global'):
+    # Handle the wallclock
+    if wallclock == 'global':
+        clock = globalclock
+    else:
+        clock = wallclock
+
+    if clock is not None:
+        phase = phase + clock.phase(f,is_angular=False)
+        
+    
+    # Add wallclock phase
+    
+    U = _square_propagator_cpu(H0,Hrf,f,phase,amplitude,dur,pts_per_cycle)
+
+    if clock is not None:
+        clock.inc(dur)
+
+    # Return the state if rho is given
+    if len(rho) == 0:
+        return U
+    elif len(rho) == 1:
+        rho = rho[0]
+        # check if rho is a ket or a density matrix
+        isket = (rho.shape[1] == 1)
+        if isket:
+            return U*rho
+        else:
+            return U*rho*U.dag()
+    else:
+        raise ValueError('More than one rho was given. This is not supported.')
+    
+def _square_propagator_cpu(H0,Hrf,f,phase,amplitude,dur,pts_per_cycle=100):
+    num_full_osc = int(_np.floor(dur*f))
+    dt = 1/(f*pts_per_cycle)
+    cycle = _np.linspace(0,1/f-dt,pts_per_cycle)
+    cycle = amplitude*_np.sin(2*_np.pi*f*cycle+phase)
+    Ucycle = prop(H0,dt,H1=[Hrf],carr1=cycle,wallclock=None)
+    
+    Ucycle = Ucycle**num_full_osc
+    
+    # Now add the remaining part of non-complete oscillation
+    rf_remain = _np.arange(num_full_osc/f, dur, dt) 
+    
+    if len(rf_remain) == 0:
+        return Ucycle
+    
+    cycle = amplitude*_np.sin(2*_np.pi*f*rf_remain+phase)
+    Uremain = prop(H0,dt,H1=[Hrf],carr1=cycle,wallclock=None)
+    return Uremain*Ucycle
+
+def cos2_pulse(H0,Hrf,f,phase,amplitude,dur,*rho,pts_per_cycle=100,wallclock='global'):
+    #
+    raise NotImplementedError('This function is not yet implemented.')
+
+# Legacy arb_pulse
+arb_pulse = prop
