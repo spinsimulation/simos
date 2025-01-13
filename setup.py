@@ -14,7 +14,7 @@ SimOS aims to provide a pen-and-paper style of simulation, minimizing high-level
 """
 
 setup(name='simos',
-      version='0.2.1',
+      version='0.2.2',
       description='Spin simulations in Python (NMR, EPR/ESR as well as ODMR).',
       long_description=longdescription,
       long_description_content_type='text/markdown',
