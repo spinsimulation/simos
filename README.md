@@ -32,6 +32,16 @@ for computationally efficient time propagation. In addition spatial dynamics suc
 as rotational diffusion, linear flow or magic angle spinning can be simulated with 
 our Fokker-Planck framework.
 
+
+## How to Cite
+If you find this project useful, then please cite:
+
+Laura A. Völker, John M. Abendroth, Christian L. Degen and Konstantin Herb: <br>
+*SimOS: A Python Framework for Simulations of Optically Addressable Spins* <br>
+arXiv:2501.05922 <br>
+https://doi.org/10.48550/arXiv.2501.05922
+
+
 ## Contribution guidelines
 Documentation is important! 
 

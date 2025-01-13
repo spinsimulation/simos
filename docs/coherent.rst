@@ -45,12 +45,12 @@ field vector i.e. :math:`\vec{X} \equiv (B_x, B_y, B_z)`.
 The interaction matrix :math:`\textbf{A}`  can alternatively be formulated as spherical tensors of rank 0, 1 and 2 whose construction and utilization is 
 detailed in our section on :ref:`spherical tensors <Spherical>`. 
 Further, we can for each interaction distinguish the laboratory frame of reference (LAB) from a principal axis system (PAS) of reference. In the PAS of the interaction, the rank 0 and rank 2 
-contributions, which together constitute the anti-symmetric part of :math:`\mathbf{A}`, are diagonal. The PAS representation of :math:`\mathbf{A}`, in the following referred to as  :math:`\mathbf{a}`,  
+contributions, which together constitute the symmetric part of :math:`\mathbf{A}`, are diagonal. The PAS representation of :math:`\mathbf{A}`, in the following referred to as  :math:`\mathbf{a}`,  
 is conveniently parametrized via
 
 *  the trace :math:`\overline{a}  = (a_{xx} + a_{yy} + a_{zz}) / 3` for rank 0
-*  the elements :math:`a_{xy}, a_{xz}, a_{yz}` for the symmetrix rank 1 component, and,
-*  the anisotropy :math:`\delta = a_{zz} - \overline{a}` and asymmetry :math:`\eta = \frac{a_{yy}-a_{zz}}{\delta}` for the rank 2 component.
+*  the elements :math:`a_{xy}, a_{xz}, a_{yz}` for the rank 1 component, and,
+*  the anisotropy :math:`\delta = a_{zz} - \overline{a}` and asymmetry :math:`\eta = \frac{a_{yy}-a_{xx}}{\delta}` for the rank 2 component.
 
 Here we assume the ordering
 
@@ -72,7 +72,7 @@ Initialising the Spatial Part
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To facilitate handling of various formalisms as well as LAB and PAS representations for the spatial component of coherent interactions, we provide the class :class:`AnisotropicCoupling`. 
-It can be initialised from LAB or PAS matrix or spherical tensor representations of the spatial interaction component or a subset of parameters :math:`\overline{a}, a_{xy}, a_{xz}, a_{yz}, \delta, \kappa`.
+It can be initialised from LAB or PAS matrix or spherical tensor representations of the spatial interaction component or a subset of parameters :math:`\overline{a}, a_{xy}, a_{xz}, a_{yz}, \delta, \eta`.
 If the interaction is initialised from a PAS representation, a set of euler-anngles  :math:`\alpha, \beta, \gamma` can be specified to also generate the LAB representation. When initialising
 from a LAB representation the euler angles are automatically determined via matrix diagonalisation of the rank 2 component.  
 
@@ -178,31 +178,32 @@ to the magnitude of the spin magnetic dipole moment. The interaction of nuclear 
 the Zeeman Hamiltonian
 
 .. math::
-   \hat{H} =  \vec{B} \cdot \mathbf{\sigma} \cdot \vec{\hat{S}}
+   \hat{H}_{\mathrm{Z}} =  \vec{B} \cdot \mathbf{\delta} \cdot \vec{\hat{S}}
 
-where :math:`\mathbf{\sigma}` is the chemical shift tensor that accounts for the microscopically corrected Zeeman interaction
+where :math:`\mathbf{\delta}` is the chemical shift tensor that accounts for the microscopically corrected Zeeman interaction
 in an external magnetic field :math:`\vec{B}`. 
 
 In isotropic media, the Hamiltonian simplifies to 
 
 .. math::
-   \hat{H} =  \sigma_{iso} \vec{B} \cdot \vec{\hat{S}}
+   \hat{H}_{\mathrm{Z}}  =  \delta_{iso} \vec{B} \cdot \vec{\hat{S}}
 
 with a scalar, isotropic chemical shift :math:`\delta_{\mathrm{iso}}`. In the simplest case  :math:`\delta_{\mathrm{iso}} = \gamma` , the gyromagnetic
 ratio of the bare nucleus or electron.  SimOS provides a method :code:`zeeman_interaction()` to specify generic Zeeman interactions for individual spins.  The interaction strength, 
-i.e. :math:`\mathbf{\sigma}` can be provided as a scalar (for isotropic interactions), a 3x3 matrix, an instance of the :class:`AnisotropicCoupling` class or a tuple with 3 or 6 entries,
+i.e. :math:`\mathbf{\delta}` can be provided as a scalar (for isotropic interactions), a 3x3 matrix, an instance of the :class:`AnisotropicCoupling` class or a tuple with 3 or 6 entries,
 specifying the isotropic chemical shift :math:`\delta_{\mathrm{iso}}`, span :math:`\Omega`, skew :math:`\kappa` and, possibly, three euler angles in :math:`zyz` ordering. 
 Span and skew are commonly utilized to parametrize the anisotropic chemical shift and are defined as
 
 .. math::
    
-   \Omega = a_{zz} - a_{xx}
+   \Omega = \delta_{xx} - \delta_{zz}
 
 .. math::
    
-   \kappa =\frac{3\overline{a} - a_{zz}}{\Omega}
+   \kappa = \frac{3 (\delta_{yy} - \delta_{iso})}{\Omega}
 
-from the principal components of the CSA tensor. The code below illustrates initialisation of a zeeman interaction for the isotropic case and for an anisotropic CSA, utilizing initialisation from CSA parameters.
+from the principal components of the chemical shift tensor assuming an ordering :math:`\delta_{xx} \geq \delta_{yy} \geq \delta_{zz}` of the principal components following the IUPAC convention for chemical shift.
+The code below illustrates initialisation of a zeeman interaction for the isotropic case and for an anisotropic CSA, utilizing initialisation from CSA parameters.
 
 .. code-block:: python
 
@@ -238,7 +239,7 @@ The dipolar coupling between pairs of nuclear or electronic spins is a through-s
 The dipolar coupling Hamiltonian
 
 .. math::
-   \hat{H}_{dip} = -\frac{\mu_0 \hbar \gamma_1 \gamma_2}{4 \pi}\frac{1}{r^3} \left(  3(\vec{S_1}\cdot \vec{r_u})(\vec{S_2}\cdot \vec{r_u}) - \vec{S_1}\cdot \vec{S_2}\right)   \\ 
+   \hat{H}_{\mathrm{dip}} = -\frac{\mu_0 \hbar \gamma_1 \gamma_2}{4 \pi}\frac{1}{r^3} \left(  3(\vec{S_1}\cdot \vec{r_u})(\vec{S_2}\cdot \vec{r_u}) - \vec{S_1}\cdot \vec{S_2}\right)   \\ 
    =  \vec{S_1}^T \cdot \mathbf{D} \cdot \vec{S_2}
 
 can be calculated from the gyromagnetic ratios :math:`\gamma_1, \gamma_2` of the spins and the distance
@@ -266,34 +267,39 @@ Zero-Field Splitting
 ^^^^^^^^^^^^^^^^^^^^
 
 
-To incorporate zero-field splittings (ZFS) of electron spins :math:`\geq` 1 SimOS will soon provide a method :code:`zfs_interaction()`. The strength and anisotropy of the ZFS interaction are specified via the parallell, :math:`D = \frac{3}{2} D_{zz}`,
-and perpendicular, i.e. :math:`E = \frac{1}{2}(D_{xx} - D_{yy})` components of the ZFS tensor
+To incorporate zero-field splittings (ZFS)
 
 .. math::
-   \begin{pmatrix}
-   D_{xx} & 0 & 0 \\
-   0 & D_{yy} & 0 \\
-   0 & 0 & D_{zz}
-   \end{pmatrix}.
+   \hat{H}_{\mathrm{ZFS}} =  \vec{\hat{S}} \cdot \mathbf{D} \cdot \vec{\hat{S}}
 
-The ZFS-Hamiltonian results as
+of electron spins :math:`\geq` 1 SimOS provides a method :code:`zfs_interaction()`. The spatial part :math:`\mathbf{D}` of the of the ZFS interaction can be specified as a 3x3 matrix, an instance of the :class:`AnisotropicCoupling` class
+or via the parallel :math:`D` and :math:`E` and anti-parallel components of the ZFS tensor and (optionally) a set of euler angles. In the PAS of the interaction, the ZFS Hamiltonian as a function of :math:`D` and :math:`E` results as
 
 .. math::
-   \hat{H}^{\mathrm{ZFS}}=  D \left[ \hat{S}_z ^2 - \frac{1}{3} S(S+1) \right] + E \left[ \hat{S}_x^2 - \hat{S}_y^2 \right]
+   \hat{H}_{\mathrm{ZFS}}=  D \left[ \hat{S}_z ^2 - \frac{1}{3} S(S+1) \right] + E \left[ \hat{S}_x^2 - \hat{S}_y^2 \right]
 
 
 Quadrupole Interaction
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Nuclear spins with :math:`I\geq 1`  are quadrupolar and a non-spheric charge distribution of their nucleus translates into a finite electric quadrupole moment :math:`Q`. This quadrupole
+Nuclear spins with :math:`I \geq 1`  are quadrupolar and a non-spheric charge distribution of their nucleus translates into a finite electric quadrupole moment :math:`Q`. This quadrupole
 moment couples to electric field gradient (EFG) :math:`\mathbf{V}` at the nuclear site, resulting in a nuclear quadrupole interaction
 
 .. math::
-   \hat{H}_{Q} = \frac{e Q}{2I(2I-1)\hbar}\ \vec{I} \cdot \mathbf{V} \cdot \vec{I}.
+   \hat{H}_{\mathrm{Q}} = \frac{e Q}{2I(2I-1)\hbar}\ \vec{I} \cdot \mathbf{V} \cdot \vec{I} .
 
+SimOS provides method :code:`quad_interaction()` to facilitate incorporation of quadrupole interactions. The spatial part of the interaction, i.e.  :math:`\frac{e Q  \mathbf{V}}{2I(2I-1)\hbar}` can either be provided as a 3x3 matrix, as an instance of
+the :class:`AnisotropicCoupling` or via the anisotropy :math:`\delta_{\mathrm{Q}}`, the asymmetry :math:`\eta_{\mathrm{Q}}` and, if PAS and LAB frames are not aligned, a set of euler angles. Parameters :math:`\delta_{\mathrm{Q}}` and :math:`\eta_{\mathrm{Q}}` are defined as follows:
 
-We are currently working on implementing a method :code:`quad_interaction()` to facilitate incorporation of quadrupole interactions. As soon as the method
-has been made available, further information on usage will be made available here. 
+.. math::
+   \delta_{\mathrm{Q}} =  \frac{eQV_{ZZ}}{2I(2I-1)\hbar} =  \frac{C_{\mathrm{Q}}}{2I(2I-1)}
+
+and 
+
+.. math::
+   \eta_{\mathrm{Q}} = \frac{V_{YY}- V_{XX}}{V_{ZZ}}
+
+using an ordering :math:`|V_{ZZ}| \geq |V_{XX}| \geq |V_{YY}|` of the principal components of the EFG tensor and introducing the quadrupolar coupling constant :math:`C_{\mathrm{Q}}`, a common out put parameter of many quantum mechanical modelling packages. 
 
 
 Syntax Reference
@@ -301,4 +307,4 @@ Syntax Reference
 
 .. py:currentmodule:: simos.coherent
 .. automodule:: simos.coherent
-   :members: AnisotropicCoupling, interaction_hamiltonian, zeeman_interaction, auto_zeeman_interaction, dipolar_spatial, dipolar_coupling 
+   :members: AnisotropicCoupling, interaction_hamiltonian, zeeman_interaction, auto_zeeman_interaction, dipolar_spatial, dipolar_coupling, zfs_interaction, quad_interaction

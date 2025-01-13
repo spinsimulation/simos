@@ -73,6 +73,17 @@ Contact Details:
 * `Laura A. Völker <https://spin.ethz.ch/team/contact-details/person-detail.MjI4ODkx.TGlzdC80MDI0LC0xOTg4OTkxNzI3.html>`_
 
 
+How to Cite
+===========
+
+If you find this project useful, then please cite:
+
+| Laura A. Völker, John M. Abendroth, Christian L. Degen and Konstantin Herb: 
+| *SimOS: A Python Framework for Simulations of Optically Addressable Spins*
+| arXiv:2501.05922
+| https://doi.org/10.48550/arXiv.2501.05922
+
+
 Indices and tables
 ==================
 
