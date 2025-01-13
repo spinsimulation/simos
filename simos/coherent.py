@@ -46,7 +46,7 @@ class AnisotropicCoupling():
         * *spher* -- Spherical tensor representation of interaction.
         * *iso* -- Isotropic value of interaction.
         * *delta* -- Anisotropy of interaction.
-        * *kappa* -- Asymmetry of interaction.
+        * *eta* -- Asymmetry of interaction.
         * *axy* -- xy matrix element in PAS.
         * *axz* -- xz matrix element in PAS.
         * *ayz* -- yz matrix element in PAS.
@@ -300,9 +300,9 @@ def interaction_hamiltonian(system, spin1, A, approx = "None", frame = "lab", mo
 
     :Keyword Arguments:
         * *approx* (`` str`` ) --
-          Specifies the approximation. Can be "None", "Secular", "Pseudosecular", "Hfi" or any letter "a"-"f" and combinations thereoff.
+          Specifies the approximation. Can be "None", "Secular", "Pseudosecular", "Hfi" or any letter "a"-"f" and combinations thereoff for spin-spin interactions and  "None" or "Secular" for spin-field interactions.
         * *frame* (``str``) --
-          Can be 'pas' or 'lab', specifies whether the Hamiltonian is returned in the principal axis system of the interaction or the principal axis system.
+          Can be 'pas' or 'lab', specifies whether the Hamiltonian is returned in the principal axis system of the interaction or the laboratory frame of reference.
         * *spin2* (`` str`` ) --     
           Specifies the name of the 2nd spin in spin-spin interactions.
         * *field* --     
@@ -310,7 +310,7 @@ def interaction_hamiltonian(system, spin1, A, approx = "None", frame = "lab", mo
         * *mode* (``str``) --
           Can be 'cart' or 'spher', specifies whether the field is provided in cartesian or spherical coordinates.
 
-    :returns: Hamiltonian of the spin-field interaction, a 3x3 matrix.
+    :returns: Hamiltonian of the spin-spin or spin-field interaction, a 3x3 matrix.
     """
     # Enable case insensitive approximation.
     approx = approx.lower()
@@ -404,19 +404,21 @@ def interaction_hamiltonian(system, spin1, A, approx = "None", frame = "lab", mo
 
 
 
-def zeeman_interaction(system, spin, y, *args, mode = "cart"):
+def zeeman_interaction(system, spin, y, *args, mode = "cart", **kwargs):
     """ Zeeman Hamiltonian of a single spin.
 
     :param System system: An instance of the System class.
     :param str spin: Name of the selected spin.
-    :param y: Coupling strength of the interaction, can be a scalar , a 3x3 matrix ar an instance of the AnisotropicCoupling class.
+    :param y: Spatial part of the interaction, can be a scalar , a 3x3 matrix, an instance of the AnisotropicCoupling class or a tuple/list with 3 (or 6) entries specifing isotropic chemical shift, span and skew (and 3 euler angles).
     :param *args: Magnetic field, specified as a single argument [x,y,z] or three separate arguments x,y,z. 
 
     :Keyword Arguments:
         * *mode* (``str``) --
           Can be 'cart' or 'spher', specifies whether the field is provided in cartesian or spherical coordinates.
-    
-    :returns: Hamiltonian of the spin-field interaction, a 3x3 matrix.
+        * *approx* (`` str`` ) --
+          Specifies the approximation. Can be "None" or "Secular".
+
+    :returns: Hamiltonian of the Zeeman interaction, a 3x3 matrix.
     """
     # Extract the field from *args.
     if len(args) == 3:
@@ -427,9 +429,10 @@ def zeeman_interaction(system, spin, y, *args, mode = "cart"):
         raise ValueError("Wrong number of coordinates provided")
     if mode == "spher":
         field = spher2cart(field)
-    # Construct the Zeeman Hamiltonian.
-    if len(_np.shape(y)) == 0 or _np.shape(y) ==(3,3):
+    # Construct the Zeeman Hamiltonian from Anisotropic coupling, scalar or matrix.
+    if isinstance(y, AnisotropicCoupling) or len(_np.shape(y)) == 0 or _np.shape(y) ==(3,3):
         return interaction_hamiltonian(system, spin, y, field= field,  mode = mode, frame = "lab")
+    # Construct the Zeeman Hamiltonian from isotropic shift, span, skew (and euler angles).
     else:
         if system.method == "sympy":
             calcmode = "symbolic"
@@ -450,7 +453,7 @@ def zeeman_interaction(system, spin, y, *args, mode = "cart"):
 
 def auto_zeeman_interaction(spin_system, *args , mode = "cart", rotating_frame= []):
     """ Returns the combined Zeeman Hamiltonian for all spins in a system using the tabulated isotropic gyromagnetic
-    ratios of their type (i.e. does not not consider any chemical shielding!). 
+    ratios of their type (i.e. does not not consider any chemical shielding or anisotropy!). 
 
     :param System spin_system: An instance of the System class.
     :param *args: Magnetic field, specified as a single argument [x,y,z] or three separate arguments x,y,z. 
@@ -480,7 +483,7 @@ def auto_zeeman_interaction(spin_system, *args , mode = "cart", rotating_frame= 
     return H
 
 
-def dipolar_coupling(system, spin1, spin2, y1, y2, *args, mode = 'spher', approx = 'Full'):  
+def dipolar_coupling(system, spin1, spin2, y1, y2, *args, mode = 'spher', **kwargs):  
     """ Returns a dipolar coupling Hamiltonian.
    
     :param System system: An instance of the System class.
@@ -500,13 +503,75 @@ def dipolar_coupling(system, spin1, spin2, y1, y2, *args, mode = 'spher', approx
      
     """   
     D = AnisotropicCoupling(mat = dipolar_spatial(y1, y2, *args, mode = mode, case = 'matrix'), labonly = True)
-    return interaction_hamiltonian(system, spin1, D, spin2 = spin2, approx = approx, frame = "lab")
+    return interaction_hamiltonian(system, spin1, D, spin2 = spin2,  frame = "lab", **kwargs)
 
-def zfs_interaction(system, spin, D, E):
-    raise NotImplementedError
+def zfs_interaction(system, spin, ZFS, **kwargs):
+    """ Returns the zero-field-splitting (ZFS) Hamiltonian.
 
-def quad_interaction(system, spin, Q, V):
-    raise NotImplementedError
+    :param System system: An instance of the System class.
+    :param str spin: Name of the spin for which the interaction is defined.
+    :param ZFS: Spatial part of the ZFS interaction, can be a 3x3 matrix or an instance of the AnisotropicCoupling class or a tuple/list with 2 (or 5) entries which specify D and E (and 3 euler angles).
+
+    :returns: The zero-field-splitting Hamiltonian, a 3x3 matrix. 
+
+    """ 
+    # define ZFS Hamiltonian from matrix or predefined Anistropic Coupling instance 
+    if isinstance(ZFS, AnisotropicCoupling) or _np.shape(ZFS) ==(3,3):
+        return interaction_hamiltonian(system, spin, ZFS, spin2 = spin, frame = "lab")
+    # define ZFS Hamiltonian from D (and E) parameters, and, possibly, euler angles
+    else:
+        if system.method == "sympy":
+            calcmode = "symbolic"
+        else:
+            calcmode = "numeric"
+        array_fun = backends.get_calcmethod("array", calcmode)
+        pow_fun = backends.get_calcmethod("pow", calcmode)
+        ZFS_mat = array_fun(_np.zeros((3,3), dtype = int))
+        if len(_np.shape(ZFS)) == 0:
+            D = ZFS
+            E = 0
+            euler = [0,0, 0]
+        else:
+            D = ZFS[0] 
+            if len(ZFS) > 1 :
+                E = ZFS[1]
+            else:
+                E = 0
+            if len(ZFS) == 5:
+                euler = [ZFS[2], ZFS[3], ZFS[4]]
+            else:
+                euler = [0,0,0]
+        ZFS_mat[0,0] = pow_fun(-3, -1)*D + E
+        ZFS_mat[1,1] = pow_fun(-3, -1)*D - E
+        ZFS_mat[2,2] = 2*pow_fun(3, -1)*D
+        print(ZFS_mat)
+        A = AnisotropicCoupling(mat = ZFS_mat, euler = euler, frame = "pas")
+        return interaction_hamiltonian(system, spin, A, spin2 = spin, frame = "lab", **kwargs)
+    
+
+
+def quad_interaction(system, spin, QUAD, **kwargs):
+    """ Returns the quadrupole coupling Hamiltonian.
+   
+    :param System system: An instance of the System class.
+    :param str spin: Name of the spin for which the interaction is defined.
+    :param QUAD: Spatial part of the quadrupole interaction, can be a 3x3 matrix or an instance of the AnisotropicCoupling class or a tuple/list with 2 (or 5) entries which specify anisotropy and assymetry of the interaction  (and 3 euler angles).
+        
+    :returns: The quadrupole Hamiltonian, a 3x3 matrix.
+    """ 
+    # define quadrupole Hamiltonian from matrix or predefined Anistropic Coupling instance 
+    if isinstance(QUAD, AnisotropicCoupling) or _np.shape(QUAD) ==(3,3):
+        return interaction_hamiltonian(system, spin, QUAD, spin2 = spin, frame = "lab")
+    # define ZFS Hamiltonian from CQ and anisotropy parameters, and, possibly, euler angles
+    else:
+        delta = QUAD[0]
+        eta = QUAD[1]
+        if len(QUAD) == 5:
+            euler = [QUAD[2], QUAD[3], QUAD[4]]
+        else:
+            euler = [0,0,0]
+        A = AnisotropicCoupling(delta = delta, eta = eta, euler = euler)
+        return interaction_hamiltonian(system, spin, A, spin2 = spin, frame = "lab", **kwargs)
 
 
 
