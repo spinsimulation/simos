@@ -175,6 +175,12 @@ def transition_operators(spinsystem, rates):
                 transform = True
                 Tto = getattr(spinsystem, "to"+basisname)
                 Tfrom = getattr(spinsystem,"from"+basisname) 
+            elif "_" in name2:
+                basisname = name2.split("_")[0]
+                warnings.warn("Source and sink of a transition are not specified in the same basis. Basis transformation will be performed for both, which may be erroneous.")
+                transform = True
+                Tto = getattr(spinsystem, "to"+basisname)
+                Tfrom = getattr(spinsystem,"from"+basisname)                 
             for name_num in [name1, name2]:
                 operator = spinsystem.id                  
                 names = name_num.split(",") 
