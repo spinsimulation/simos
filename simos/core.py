@@ -324,7 +324,7 @@ def subsystem(system, op, selection, keep = True):
         # Extract with projection if tuple.
         elif isinstance(subsystems, tuple): 
             subdims = [get_subdims(s) for s in subsystems]
-            pos = [list(_np.arange(0, i)+subdims[j-1]) if j > 0 else list(_np.arange(0,i)) for j,i in enumerate(subdims)]
+            pos = [list(_np.arange(0, i)+int(_np.sum(subdims[0:j]))) if j > 0 else list(_np.arange(0,i)) for j,i in enumerate(subdims)]
             keeppos = flatten([pos[k] for k in keep])
             droppos = flatten([pos[k] for k in drop])
             reverse.insert(0, ["direct", keeppos, droppos, dropnames])
