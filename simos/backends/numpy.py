@@ -532,7 +532,9 @@ def applySuperoperator(L, rho):
     rho2 = rho.ravel('F')[:, None]
     shape = rho.shape
     rho2 = L.dot(rho2)
-    return rho2.reshape(shape, order='F')
+    rho2 = rho2.reshape(shape, order='F')
+    rho2.dims = rho.dims
+    return rho2 
 
 ###############################################################
 #################    Fokker Planck Space      #################
