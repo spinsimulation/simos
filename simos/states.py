@@ -4,6 +4,7 @@ import numpy as _np
 from .propagation import rot
 from .qmatrixmethods import tidyup, ket2dm
 from .constants import kB
+from .trivial import parse_state_string
 
 ###########################################################
 # Functions to generate intitial states
@@ -18,24 +19,14 @@ def state(system, statename : str):
 
     :returns: The initial state (ket state vector).
     """
+    # Parse the provided state name. 
     operator = system.id
-    sub_names = []
-    names = statename.split(",") 
-    for name in names:
-        # Remove white spaces
-        name = name.replace(" ", "")
-        # Extract spin spin sublevel, if provided.  
-        if '[' in name and  ']' in name: 
-            value = float(name.split('[')[1].split(']')[0])
-            name = name.split('[')[0]   
-            operator = operator * getattr(system, name+"p")[value]         
-        else:
-            value = None
+    names_parsed = parse_state_string(statename)
+    for name in names_parsed.keys():
+        if names_parsed[name] is None:
             operator = operator * getattr(system, name+"id")
-        # Verify that members only occur once.
-        if name  in sub_names:
-            raise ValueError("State has an invalid format. Level '" + name + "' may only occur once.")
-        sub_names.append(name)
+        else:
+            operator = operator * getattr(system, name+"p")[names_parsed[name]]         
     # Return ket.
     tidyup_fun = getattr(getattr(backends, system.method), "tidyup")
     out = tidyup_fun(operator.diag(), dims  = [system.dims[0], [1]])

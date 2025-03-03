@@ -1,6 +1,8 @@
 import numpy as _np
 from . import backends
 import warnings
+from .trivial import parse_state_string, write_state_string
+
 
 ###########################################################
 # Automatic spin-Relaxation
@@ -92,33 +94,26 @@ def tidyup_ratedict(spinsystem, rates):
     tidyrates = {}
     # Method to add a rate to a dictionary.
     def _add_rate(name1, name2, rate, key):
-        new_names = []
-        for name_num in [name1, name2]: # further process source and sink descriptors
-            sub_names = []
-            full_names = []
-            names = name_num.split(",") 
-            for name in names:
-                name = name.replace(" ", "") #get rid off white spaces 
-                if '[' in name and  ']' in name: # if spin sublevel provided, extract 
-                    value = float(name.split('[')[1].split(']')[0])
-                    name = name.split('[')[0]            
-                else:
-                    value = None
-                if name  in sub_names: #check if this level has already appeared once 
-                    raise ValueError("Rate '" + key + "' has an invalid format. Level '" + name + "' may only occur once.")
-                sub_names.append(name)
-                if value is not None:
-                    full_names.append(name+"["+str(value)+"]")   
-                else:
-                    full_names.append(name)
-            full_names = sorted(full_names)
-            full_names = "".join([i+"," for i in full_names[0:-1]] + [full_names[-1]])
-            new_names.append(full_names)
-        new_key = new_names[0]+"->" +new_names[1]
-        if new_key in tidyrates.keys():
-            raise ValueError("Rate '" + new_key + "' cannot be specified more than once.")
+        for ind_name, name in enumerate([name1, name2]):
+            # parse 
+            try:
+                name_parsed = parse_state_string(name)
+            except ValueError:
+                raise ValueError("Rate '" + key + "' has an invalid format")
+            # check if names members of spin system
+            for sname in name_parsed.keys():
+                if sname+"id" not in dir(spinsystem):
+                    raise ValueError("Rate '" + key + "' has an invalid format")
+            # add correct state description to total string
+            if ind_name == 0 :
+                s = write_state_string(name_parsed)+"->"
+            else:
+                s += write_state_string(name_parsed)
+        # add the key-value pair to the dictionary 
+        if s in tidyrates.keys():
+                    raise ValueError("Rate '" + s + "' cannot be specified more than once.")
         else:
-            tidyrates[new_key] = rate
+            tidyrates[s] = rate
     # Process all keys of the dictionary one by one. 
     for key, rate in rates.items(): 
             # Split the process in source and sink.
@@ -182,15 +177,13 @@ def transition_operators(spinsystem, rates):
                 Tto = getattr(spinsystem, "to"+basisname)
                 Tfrom = getattr(spinsystem,"from"+basisname)                 
             for name_num in [name1, name2]:
-                operator = spinsystem.id                  
-                names = name_num.split(",") 
-                for name in names:
-                    if '[' in name: # if spin sublevel provided, extract 
-                        value = float(name.split('[')[1].split(']')[0])
-                        name = name.split('[')[0]
-                        operator = operator * getattr(spinsystem, name+"p")[value]
-                    else: # if no spin sublevel provided, take level-id 
+                operator = spinsystem.id    
+                names_parsed = parse_state_string(name_num)
+                for name in names_parsed.keys():
+                    if names_parsed[name] is None:
                         operator = operator * getattr(spinsystem, name+"id")
+                    else:
+                        operator = operator * getattr(spinsystem, name+"p")[names_parsed[name]]
                 if transform:
                     operator = operator.transform(Tto)
                 coll_states.append((_np.where(abs((operator).diag()) > 1e-9)[0]))

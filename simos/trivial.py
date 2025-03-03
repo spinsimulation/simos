@@ -1,6 +1,7 @@
 import numpy as _np
 from . import backends
 from .constants import eps_0
+import re
 
 ###########################################################
 # TRIVIAL CONVERSION FUNCTIONS, sympy compatible
@@ -375,3 +376,38 @@ def rotate_matrix(mat, *args, inverse = False, **kwargs):
     # Perform the actual rotation. 
     rotate_fun = backends.get_calcmethod("rotate",  calcmethod)
     return rotate_fun(mat, R, inverse)
+
+################################################
+# Parse State                                  #
+################################################
+
+def parse_state_string(s):
+    """Parse a string which desribes a state of a given system into a dictionary of spin name (key) and projected spin value (value). 
+    :param str s: A string which describes the state.
+    :returns: The parsed dictionary. 
+    """
+    pattern = r'([A-Za-z0-9_]+)(?:\[(\-?\d*\.?\d+)\])?'
+    matches = re.findall(pattern, s)
+    keys = [i[0] for i in matches]
+    
+    # Check for duplicate keys
+    if len(keys) != len(set(keys)):
+        raise ValueError("Duplicate keys found")
+    
+    return {key: float(value) if value else None for key, value in matches}
+
+def write_state_string(d):
+    """Writes a string which desribes a state of a given system from a dictionary of spin name (key) and projected spin value (value). 
+    :param dict d: A dictionary which describes the state.
+    :returns: The state string. 
+    """
+    s = ""
+    for key in sorted(d.keys()):
+        s+=key
+        if d[key] is not None:
+            s+="["+str(d[key])+"]"
+        s+=","
+    return s[:-1]
+
+
+
