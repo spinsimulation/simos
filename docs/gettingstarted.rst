@@ -54,6 +54,20 @@ Note on versions
 ^^^^^^^^^^^^^^^^
 SimOS is developed for Python 3.9 and higher. Numpy must be installed in version 1.25 or higher. Scipy must be installed in version 1.12 or higher. To use the qutip backend, qutip should be installed in version 5.0 or higher. To use the sympy backend, sympy should be installed in version 1.11 or higher. To use the numba backend, numba should be installed in version 0.58.0 or higher.
 
+Installation in an offline network
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+If you need to install SimOS in an offline (airgapped) network, you can download the required packages from PyPI and install them manually. To do this, you can use the `pip download <https://pip.pypa.io/en/stable/cli/pip_download/>`_ command:
+.. code-block:: bash
+
+    pip download simos[recommended]
+
+This will download all the required packages and their dependencies to your current directory. You can then transfer these files to the offline network and install them with the following command:
+.. code-block:: bash
+
+    pip install --no-index --find-links=. simos[recommended]
+
+This will download the package and all its dependencies into the current directory. The downloaded files will be in the form of .whl (wheel) files, which are the standard format for Python packages. Note that you will need to have pip installed in the offline network (see `here <https://pip.pypa.io/en/stable/cli/pip_download/>`_ ). Please ensure that the Python environment on the offline network is compatible with the downloaded packages. Typically it is a good idea to use the exact mirror of the online network, e.g. the same Python version and the same operating system.
+
 Python beginners
 ^^^^^^^^^^^^^^^^	
 If you are completely new to Python, we recommend that you install the Anaconda distribution, which includes Python, the Jupyter notebook environment and many scientific libraries. You can download Anaconda from the following link: 
