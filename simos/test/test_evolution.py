@@ -4,6 +4,17 @@ import qutip as qu
 import sympy as sp
 import numpy as np
 
+
+def get_data(method,obj):
+    if method == 'qutip':
+        return obj.full()
+    elif method == 'numpy':
+        return obj
+    elif method == 'sympy':
+        return np.array(obj).astype(np.complex128)
+    elif method == 'sparse':
+        return obj.toarray()
+
 @pytest.mark.parametrize("method", ['qutip','numpy','sympy','sparse'])
 class TestEvolutionRates:
     #@pytest.mark.parametrize("val", np.arange(0.5,10,0.5))
@@ -245,3 +256,106 @@ class TestRotatingFrame:
         meas_qutip = simos.expect(s_qutip.Sz,rho1_qutip)
 
         #assert np.abs(meas-meas_qutip) < 1e-6
+
+
+#############################
+# Test transition operators
+#############################
+def get_data(method,obj):
+    if method == 'qutip':
+        return obj.full()
+    elif method == 'numpy':
+        return obj
+    elif method == 'sympy':
+        return np.array(obj).astype(np.complex128)
+    elif method == 'sparse':
+        return obj.toarray()
+
+@pytest.mark.parametrize("method", ['qutip','numpy','sympy','sparse'])
+class TestTransitionOperators:
+    #@pytest.mark.parametrize("val", np.arange(0.5,10,0.5))
+    def test_transition_separable(self,method):
+        S = {'name':'S','val':0.5}
+        R = {'name':'R','val':0.0}
+        T = {'name':'T','val':0.0}
+        s = simos.System([S,(R,T)],method = method)
+        rate_dict = {'R->T': 1}
+        c_op = simos.transition_operators(s,rate_dict)
+        rho0 = s.Sp[-0.5]*s.Rid
+        if method == 'sympy':
+            pi = sp.pi
+        else:
+            pi = np.pi
+        rho0 = simos.rot(s.Sy,pi/2,rho0)
+        rho0 = simos.evol(0*s.id,100,rho0,c_ops = c_op)
+        rho0 = simos.tidyup(rho0)
+
+        wanted_rho = np.array([[0,0,0,0],[0,1,0,1],[0,0,0,0],[0,1,0,1]])/2
+        assert np.allclose(get_data(method,rho0),wanted_rho)
+    
+    def test_transition_spinspecific(self,method):
+        S = {'name':'S','val':0.5}
+        R = {'name':'R','val':0.0}
+        T = {'name':'T','val':0.0}
+        s = simos.System([S,(R,T)],method = method)
+        rate_dict = {'R,S[0.5]->T,S[0.5]': 1}
+        c_op = simos.transition_operators(s,rate_dict)
+        rho0 = s.Sp[-0.5]*s.Rid
+        if method == 'sympy':
+            pi = sp.pi
+        else:
+            pi = np.pi
+        rho0 = simos.rot(s.Sy,pi/2,rho0)
+        rho0 = simos.evol(0*s.id,100,rho0,c_ops = c_op)
+        rho0 = simos.tidyup(rho0)
+
+        wanted_rho = np.array([[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,1]])/2
+        assert np.allclose(get_data(method,rho0),wanted_rho)
+
+    def test_mixed_transition(self,method):
+        S = {'name':'S','val':0.5}
+        R = {'name':'R','val':0.0}
+        T = {'name':'T','val':0.0}
+        s = simos.System([S,(R,T)],method = method)
+        rate_dict = {'R,S[0.5]->T': 1}
+        c_op = simos.transition_operators(s,rate_dict)
+        rho0 = s.Sp[-0.5]*s.Rid
+        if method == 'sympy':
+            pi = sp.pi
+        else:
+            pi = np.pi
+        rho0 = simos.rot(s.Sy,pi/2,rho0)
+        rho0 = simos.evol(0*s.id,100,rho0,c_ops = c_op)
+        rho0 = simos.tidyup(rho0)
+
+        wanted_rho = np.array([[2,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,1]])/4
+        assert np.allclose(get_data(method,rho0),wanted_rho)
+
+    def test_transition_with_basis_states(self,method):
+        GS= {'name': 'GS', 'val': 0}
+        ES = {'name': 'ES', 'val': 0}
+        system_array = (GS,ES)
+        s = simos.System(system_array,method = method)
+        T= np.array([[0.5, 0.5], [0.5, -0.5]])
+        s.add_basis(T,  "A", ["g", "e"])
+
+        cops = simos.transition_operators(s,{'A_g->A_e':1})
+        cops_wanted = np.array([[1,1],[-1,-1]])/4
+
+        assert np.allclose(get_data(method,cops[0]),cops_wanted)
+
+    def test_transition_with_ghost_spin(self,method):
+        S = {'name':'S','val':0.5}
+        I = {'name':'I','val':0.5}
+        s = simos.System([S,I],method = method)
+        s.add_ghostspin('A',['S','I'])
+        rate_dict = {'A_1->A_3': 1}
+        c_op = simos.transition_operators(s,rate_dict)
+        rho0 = s.A_1id
+        if method == 'sympy':
+            pi = sp.pi
+        else:
+            pi = np.pi
+        rho0 = simos.evol(0*s.id,100,rho0,c_ops = c_op)
+        wanted_rho = np.array([[2,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,2]])/6
+        assert np.allclose(get_data(method,rho0),wanted_rho)

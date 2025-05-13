@@ -65,8 +65,13 @@ class System():
         * *method* (''str'') -- Specifies the backend.
         """
         # Ensure validity of the names.
-        # This is a minimal check. Obvious issues (e.g. chosing same name for multiple levels) do not raise warnings or errors. 
+        # This is a minimal check. Obvious issues might not raise warnings or errors. 
         names = [i["name"] for i in totalflatten(system_array)]
+
+        # Check that there are no duplicates in the names.
+        if len(names) != len(set(names)):
+            raise ValueError("Level names and spin names must be unique.")
+        
         for name in names:
             if name.isalnum() == False:
                 raise ValueError("Member names must only contain alphanumerical letters.")
@@ -81,6 +86,7 @@ class System():
             setattr(self,name,op)
         self.system = totalflatten(system_array)
         self.dims = self.id.dims
+        self.ghosts = {}
 
     # Get, set or delete level properties after construction
     def get_property(self, level_name : str, property_name : str):
@@ -182,6 +188,10 @@ class System():
         # Transformation matrices:
         setattr(self, "to"+newname, U1)
         setattr(self, "from"+newname, _np.transpose(U1))
+
+        # Save the ghostspin information
+        self.ghosts[newname] = spinnames
+
         # If required, return the names of the new spins.
         if returnnames:
             return [newname + i for i in spin1name]
@@ -301,6 +311,12 @@ def subsystem(system, op, selection, keep = True):
     for idx, item in enumerate(selection):
         if isinstance(item, dict):
             selection[idx] = item["name"]
+    # Replace ghost spins with its constituents.
+    for i in range(len(selection)):
+        if selection[i] in system.ghosts.keys():
+            selection[i] = system.ghosts[selection[i]]
+    # Flatten the selection.
+    selection = flatten(selection)
     # Reverse if keep is False.
     if keep is False:
         selection = [i["name"] for i in system.system if i["name"] not in selection]
@@ -547,10 +563,11 @@ def _couple_spins(p1 : dict, p2 : dict, method = "qutip", T = None):
         for m2 in p2.keys():
             if isinstance(T, _np.ndarray):
                 p2[m2] = p2[m2].transform(T)
-            try:
-                pos.append(_np.where(abs((p1[m1]*p2[m2]).diag()) > 1e-9)[0])
-            except Exception as error:
-                print("Spins of different subsystems cannot be coupled.")
+            idx = _np.where(abs((p1[m1]*p2[m2]).diag()) > 1e-9)[0]
+            if len(idx) == 0:
+                raise ValueError("Spins of different subsystems cannot be coupled.")
+            else:
+                pos.append(idx)
     pos = _np.array(pos)
     pos = pos.astype(int)
     mispos = _np.where( _np.in1d( _np.arange(U.shape[0]), pos.flatten()) == False)[0] 

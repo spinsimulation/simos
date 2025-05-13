@@ -2,6 +2,7 @@ import numpy as _np
 from . import backends
 import warnings
 from .trivial import parse_state_string, write_state_string
+from .core import subsystem, reverse_subsystem
 
 
 ###########################################################
@@ -134,6 +135,88 @@ def tidyup_ratedict(spinsystem, rates):
     return tidyrates
 
 def transition_operators(spinsystem, rates):
+    """Returns the collapse operators for incoherent (optical) transitions described in a rate dictionary.
+
+    :param System spinsystem: The spin system for which the collapse operators are to be calculated.
+    :param dict rates: A rate dictionary for level transitions. The keys of the dictionary describe the levels between which transitions occur, the values are the rates of the transitions. e.g. {'A->B': 1e6, 'B->A': 1e6} describes a transition from level A to level B with a rate of 1e6 s^-1 and vice versa.
+
+    :returns list: A list of collapse operators. 
+
+    """
+    # Extract all backend specific methods.
+    if spinsystem.method == "sympy":
+        sqrt_fun = backends.get_calcmethod("sqrt", "symbolic")
+    else:
+        sqrt_fun = backends.get_calcmethod("sqrt", "numeric")
+    ket_fun = getattr(getattr(backends,spinsystem.method), 'ket')
+    bra_fun = getattr(getattr(backends,spinsystem.method), 'bra')
+    # Process all entries of a tidy rates dictionary:
+    rates = tidyup_ratedict(spinsystem, rates)
+    all_cops = [] 
+    transform  = False
+    for key, rate in rates.items():  
+            # Split the rate description in source and sink.
+            part_forward = key.split("->")
+            name1 = part_forward[0]
+            name2 = part_forward[1]
+            # Further process the descriptions of source and sink levels.
+            coll_states = []
+            # Probe whether transition occurs in alternate basis.
+            # Prohibit transition between states of different basis sets.
+            if "_" in name1:
+                basisname = name1.split("_")[0]
+                if "_" not in name2 or name2.split("_")[0] != basisname:
+                   warnings.warn("Source and sink of a transition are not specified in the same basis. Basis transformation will be performed for both, which may be erroneous.")
+                #else:
+                transform = True
+                Tto = getattr(spinsystem, "to"+basisname)
+                Tfrom = getattr(spinsystem,"from"+basisname) 
+            elif "_" in name2:
+                basisname = name2.split("_")[0]
+                warnings.warn("Source and sink of a transition are not specified in the same basis. Basis transformation will be performed for both, which may be erroneous.")
+                transform = True
+                Tto = getattr(spinsystem, "to"+basisname)
+                Tfrom = getattr(spinsystem,"from"+basisname)      
+
+
+            names_parsed = [parse_state_string(i) for i in [name1, name2]]
+            constituents = list(names_parsed[0].keys()) + list(names_parsed[1].keys())
+            # check if constituent is from basis transformation
+            separable = True
+            for c in constituents:
+                if c not in spinsystem.ghosts.keys() and c not in [i["name"] for i in spinsystem.system]:
+                    separable = False
+                    break
+            for name_num in names_parsed :
+                operator = spinsystem.id    
+                for name in name_num.keys():
+                    if name_num[name] is None:
+                        operator = operator * getattr(spinsystem, name+"id")
+                    else:
+                        operator = operator * getattr(spinsystem, name+"p")[name_num[name]]
+                if transform:
+                    operator = operator.transform(Tto)
+                # Go to subsystem of involved spins/levels
+                if separable:
+                    coll, rcoll, recipe = subsystem(spinsystem, operator, constituents)
+                else:
+                    coll = operator           
+                coll_states.append((_np.where(abs((coll).diag()) > 1e-9)[0]))
+            # Construct the collapse operators.
+            for source in coll_states[0]:
+                bra = bra_fun(_np.shape(coll)[0], int(source))
+                for sink in coll_states[1]: 
+                    ket = ket_fun(_np.shape(coll)[0], int(sink)) 
+                    c_ops = sqrt_fun(rate)*(ket*bra)
+                    # Go back to original spin system
+                    if separable:
+                        c_ops = reverse_subsystem(c_ops, rcoll, recipe)
+                    if transform:
+                        c_ops = c_ops.transform(Tfrom)          
+                    all_cops.append(c_ops)
+    return all_cops 
+
+def transition_operators_old(spinsystem, rates):
     """Returns the collapse operators for incoherent (optical) transitions described in a rate dictionary.
 
     :param System spinsystem: The spin system for which the collapse operators are to be calculated.
