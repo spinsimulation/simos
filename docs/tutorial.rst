@@ -171,7 +171,7 @@ Spin-dependent fluoresence of an optically adressable spin
 The NV center in diamond is a promising candidate for quantum sensing and quantum information processing.
 Here, we aim to simulate the dynamics of an artificial optically adressable spin inspired by the NV center.
 The idea is to provide a stripped-down version of the simulation, focusing on the essentials. 
-For more detailed simulations and physical models, we refer to the :ref:`NV section <nvcenter>`.
+For more detailed simulations and physical models, see the :doc:`nvcenter` submodule.
 
 Let's consider a 5-level system with the following energy levels:
 

@@ -32,6 +32,9 @@ for computationally efficient time propagation. In addition spatial dynamics suc
 as rotational diffusion, linear flow or magic angle spinning can be simulated with 
 our Fokker-Planck framework.
 
+To access the documentation, please visit
+https://simos.readthedocs.io
+
 
 ## How to Cite
 If you find this project useful, then please cite:

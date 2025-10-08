@@ -4,7 +4,7 @@ Developer Guide
 
 This guide is intended for developers who want to contribute to the development of SimOS 
 or modify its components. If you are new to Python, we recommend that you first read the 
-:ref:`getting started guide <Getting Started>`. We are happy to welcome new contributors 
+sections under *Getting Started*. We are happy to welcome new contributors 
 to the project at any time and from any field of research where SimOS could contribute. 
 If you have any questions, please do not hesitate to contact us. 
 

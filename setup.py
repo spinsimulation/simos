@@ -27,7 +27,7 @@ setup(name='simos',
       extras_require={
             'recommended': ['qutip>=5.0.0','sympy>=1.11','matplotlib','IPython'],
             'full': ['qutip','sympy','matplotlib','numba>=0.58.0','IPython','tkinter'],
-            'docs': ['sphinx','sphinx_rtd_theme','simos[recommended]'],
+            'docs': ['sphinx','sphinx_rtd_theme','simos[recommended]','sphinx-exec-code'],
             'test': ['pytest','pytest-cov','simos[full]']
       },
       classifiers=[
