@@ -44,7 +44,7 @@ jobs:
 
     - name: Run tests and coverage
       run: |
-        python simos/test/report_versions.py
+        python tests/report_versions.py
         pytest --junitxml=report.xml --cov=simos --cov-report term --cov-report xml:coverage.xml
       continue-on-error: true
 
