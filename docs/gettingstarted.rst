@@ -115,3 +115,39 @@ Due to the amazing work of the Pyodide team, we are able to provide a virtual la
 
 
 Please note that the virtual lab is an order of magnitude slower than running SimOS natively on your machine. The initial import can take up to one minute. It is intended for educational purposes and quick testing of the library. For more complex simulations, we recommend to install SimOS on your local machine. 
+
+
+Installation using Docker
+-------------------------
+If you prefer a containerized environment, you can use the provided Docker image. The images are designed to be lightweight and easy to use, with different variants for CPU, MKL, and CUDA support. Additionally, there are overlay images that add Jupyter Notebook support for interactive computing. You will need to have Docker installed on your system to use these images. After installing Docker, you can pull the latest image from Docker Hub with the following command (pick variant as needed):
+
+.. code-block:: bash
+
+    # Base images
+    docker pull kherb27/simos:cpu
+    docker pull kherb27/simos:mkl
+    # Jupyter overlays
+    docker pull kherb27/simos:cpu-jupyter
+    docker pull kherb27/simos:mkl-jupyter
+
+Note: The CUDA images are not available on Docker Hub due to image size constraints. Please use the GitHub Container Registry (GHCR) images instead, or build the CUDA images locally using the provided Dockerfiles in the `repository <https://github.com/spinsimulation/simos-docker>`_.
+
+To run the images, use
+
+.. code-block:: bash
+
+    # Base images
+    docker run --rm -it kherb27/simos:cpu python
+    docker run --rm -it kherb27/simos:mkl python
+    # Jupyter overlays
+    docker run --rm -it -p 8888:8888 kherb27/simos:cpu-jupyter
+    docker run --rm -it -p 8888:8888 kherb27/simos:mkl-jupyter
+
+If you want a persistant workspace, mount a local directory as /workspace, e.g.
+
+.. code-block:: bash
+    
+    docker run --rm -it -p 8888:8888 -v ./persistent:/workspace/persistent kherb27/simos:cpu-jupyter
+    docker run --rm -it -p 8888:8888 -v ./persistent:/workspace/persistent kherb27/simos:mkl-jupyter
+
+You can then access the Jupyter Notebook server in your browser at http://localhost:8888.
