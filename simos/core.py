@@ -213,6 +213,10 @@ class System():
         elif _np.shape(T)[0] != self.dim:
             raise ValueError("Invalid dimension of transformation matrix. Must match the number of basis states.")
         else:
+            # Check linear independence of basis states
+            rank = _np.linalg.matrix_rank(T)
+            if rank < self.dim:
+                warnings.warn("The provided basis states are not linearly independent.")
             # Construct and set the id operators of the new basis states in the original system basis. 
             tidyup_fun = getattr(getattr(backends, self.method), 'tidyup')
             ket2dm_fun = getattr(getattr(backends, self.method), 'ket2dm')
