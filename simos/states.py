@@ -107,7 +107,7 @@ def thermal_state(H, T = 300,  unit = "Kelvin"):
     # Mutliply Boltzmann-weighted vectors.
     out = 0*H
     for val, vec  in zip(vals, vecs):
-        bfac = _np.exp(val-Ezero)/(kB*T)
+        bfac = _np.exp((val-Ezero)/(kB*T))
         out = out + bfac*ket2dm(vec)
     return out.unit()
 
